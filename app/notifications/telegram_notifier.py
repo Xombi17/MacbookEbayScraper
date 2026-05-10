@@ -11,61 +11,64 @@ from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from rich.console import Console
 from app.config import get_settings
-from app.models.listing import Listing
 
 console = Console()
 
 
-def _format_alert(listing: Listing) -> str:
+def _format_alert(listing: dict) -> str:
     """Build the formatted Telegram alert message."""
 
     # Score bar (visual)
-    score = listing.deal_score or 0.0
+    score = listing.get("deal_score") or 0.0
     filled = int(score)
     bar = "█" * filled + "░" * (10 - filled)
 
     # Chip + RAM line
     specs = []
-    if listing.chip:
-        specs.append(listing.chip)
-    if listing.ram_gb:
-        specs.append(f"{listing.ram_gb}GB RAM")
-    if listing.storage_gb:
-        tb = listing.storage_gb / 1024
-        specs.append(f"{tb:.0f}TB SSD" if tb >= 1 else f"{listing.storage_gb}GB SSD")
+    if listing.get("chip"):
+        specs.append(listing["chip"])
+    if listing.get("ram_gb"):
+        specs.append(f"{listing['ram_gb']}GB RAM")
+    if listing.get("storage_gb"):
+        tb = listing["storage_gb"] / 1024
+        specs.append(f"{tb:.0f}TB SSD" if tb >= 1 else f"{listing['storage_gb']}GB SSD")
     specs_str = " · ".join(specs) if specs else "Specs unknown"
 
     # Price line
-    total_price = (listing.price or 0) + (listing.shipping_cost or 0)
-    price_str = f"${listing.price:,.0f}" if listing.price else "Price unknown"
-    if listing.shipping_cost and listing.shipping_cost > 0:
-        price_str += f" + ${listing.shipping_cost:.0f} shipping"
-    elif listing.shipping_cost == 0:
+    price = listing.get("price")
+    shipping = listing.get("shipping_cost")
+    
+    price_str = f"${price:,.0f}" if price else "Price unknown"
+    if shipping and shipping > 0:
+        price_str += f" + ${shipping:.0f} shipping"
+    elif shipping == 0:
         price_str += " (free shipping)"
 
     # Seller line
     seller_parts = []
-    if listing.seller_name:
-        seller_parts.append(listing.seller_name)
-    if listing.seller_rating:
-        seller_parts.append(f"{listing.seller_rating:.1f}% feedback")
+    if listing.get("seller_name"):
+        seller_parts.append(listing["seller_name"])
+    if listing.get("seller_rating"):
+        seller_parts.append(f"{listing['seller_rating']:.1f}% feedback")
     seller_str = " · ".join(seller_parts) if seller_parts else "Seller unknown"
 
     # Battery
-    batt_str = f"{listing.battery_health}%" if listing.battery_health else "Not reported"
+    batt_str = f"{listing['battery_health']}%" if listing.get("battery_health") else "Not reported"
 
     # Condition
-    cond_str = listing.condition or "Unknown"
+    cond_str = listing.get("condition") or "Unknown"
 
     # Returns
-    ret_str = listing.return_policy or "Unknown"
+    ret_str = listing.get("return_policy") or "Unknown"
 
     # AI summary
-    summary_str = listing.ai_summary or "No AI summary available."
+    summary_str = listing.get("ai_summary") or "No AI summary available."
 
+    title = listing.get("title") or 'MacBook Pro'
+    
     return (
         f"🔥 *High-Value MacBook Deal*\n\n"
-        f"*{listing.title or 'MacBook Pro'}*\n"
+        f"*{title}*\n"
         f"`{specs_str}`\n\n"
         f"💰 *Price:* {price_str}\n"
         f"🔋 *Battery:* {batt_str}\n"
@@ -78,7 +81,7 @@ def _format_alert(listing: Listing) -> str:
     )
 
 
-async def send_deal_alert(listing: Listing) -> bool:
+async def send_deal_alert(listing: dict) -> bool:
     """
     Send a Telegram alert for a high-value listing.
     Returns True on success, False on failure.
@@ -98,7 +101,7 @@ async def send_deal_alert(listing: Listing) -> bool:
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton(
                 text="🔗 Open Listing on eBay",
-                url=listing.listing_url,
+                url=listing.get("url") or listing.get("listing_url", "https://ebay.com"),
             )]
         ])
 
@@ -109,11 +112,14 @@ async def send_deal_alert(listing: Listing) -> bool:
             reply_markup=keyboard,
             disable_web_page_preview=False,
         )
-
+        
+        title = listing.get("title") or 'Unknown'
+        score = listing.get("deal_score") or 0.0
+        
         console.print(
             f"  [bold green]📬 Telegram alert sent[/bold green]: "
-            f"{listing.title[:50] if listing.title else 'Unknown'}... "
-            f"(score={listing.deal_score:.1f})"
+            f"{title[:50]}... "
+            f"(score={score:.1f})"
         )
         return True
 
