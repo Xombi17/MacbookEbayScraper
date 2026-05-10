@@ -1,18 +1,28 @@
 """
 FastAPI routes — REST API for querying listings and triggering pipeline runs.
+Adapted for MongoDB.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, Security
+from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-from app.database.database import get_session
-from app.models.listing import Listing
+from app.database.database import get_db
+from app.config import get_settings
 
 router = APIRouter()
+
+API_KEY_NAME = "X-API-Key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+async def get_api_key(api_key_header: str = Security(api_key_header)):
+    """API key verification for protected endpoints."""
+    settings = get_settings()
+    if api_key_header != settings.admin_api_key:
+        raise HTTPException(status_code=403, detail="Could not validate API key")
+    return api_key_header
 
 
 # ── Response Schemas ──────────────────────────────────────────────────────────
@@ -30,9 +40,8 @@ class ListingOut(BaseModel):
     battery_health: Optional[int]
     seller_name: Optional[str]
     seller_rating: Optional[float]
-    return_policy: Optional[str]
     image_url: Optional[str]
-    listing_url: str
+    url: str
     deal_score: Optional[float]
     ai_summary: Optional[str]
     scam_probability: Optional[float]
@@ -40,8 +49,6 @@ class ListingOut(BaseModel):
     rejection_reason: Optional[str]
     is_notified: bool
     created_at: Optional[datetime]
-
-    model_config = {"from_attributes": True}
 
 
 class StatsOut(BaseModel):
@@ -67,97 +74,96 @@ async def get_listings(
     min_score: Optional[float] = Query(None, ge=0.0, le=10.0),
     chip: Optional[str] = Query(None, description="Filter by chip e.g. 'M1 Max'"),
     min_ram: Optional[int] = Query(None, description="Minimum RAM in GB"),
-    include_rejected: bool = Query(False),
-    session: AsyncSession = Depends(get_session),
+    include_rejected: bool = Query(False)
 ):
     """
     List all stored listings with optional filters.
     """
-    stmt = select(Listing).order_by(desc(Listing.deal_score))
+    db = get_db()
+    query = {}
 
     if not include_rejected:
-        stmt = stmt.where(Listing.is_rejected == False)  # noqa: E712
+        query["is_rejected"] = False
     if min_score is not None:
-        stmt = stmt.where(Listing.deal_score >= min_score)
+        query["deal_score"] = {"$gte": min_score}
     if chip:
-        stmt = stmt.where(Listing.chip.ilike(f"%{chip}%"))
+        query["chip"] = {"$regex": chip, "$options": "i"}
     if min_ram:
-        stmt = stmt.where(Listing.ram_gb >= min_ram)
+        query["ram_gb"] = {"$gte": min_ram}
 
-    stmt = stmt.offset(offset).limit(limit)
-    result = await session.execute(stmt)
-    listings = result.scalars().all()
-    return [ListingOut.model_validate(l) for l in listings]
+    cursor = db.listings.find(query).sort("deal_score", -1).skip(offset).limit(limit)
+    listings = await cursor.to_list(length=limit)
+    
+    # Map _id to id for the response
+    for l in listings:
+        l["id"] = str(l["_id"])
+    return listings
 
 
 @router.get("/listings/{listing_id}", response_model=ListingOut, tags=["Listings"])
-async def get_listing(
-    listing_id: str,
-    session: AsyncSession = Depends(get_session),
-):
+async def get_listing(listing_id: str):
     """
     Retrieve a single listing by ID.
     """
-    result = await session.execute(
-        select(Listing).where(Listing.id == listing_id)
-    )
-    listing = result.scalar_one_or_none()
+    db = get_db()
+    listing = await db.listings.find_one({"_id": listing_id})
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
-    return ListingOut.model_validate(listing)
+    
+    listing["id"] = str(listing["_id"])
+    return listing
 
 
 @router.get("/top-deals", response_model=list[ListingOut], tags=["Listings"])
-async def get_top_deals(
-    limit: int = Query(10, ge=1, le=50),
-    session: AsyncSession = Depends(get_session),
-):
+async def get_top_deals(limit: int = Query(10, ge=1, le=50)):
     """
     Return the top-N highest-scored, non-rejected listings.
     """
-    result = await session.execute(
-        select(Listing)
-        .where(Listing.is_rejected == False)  # noqa: E712
-        .where(Listing.deal_score.isnot(None))
-        .order_by(desc(Listing.deal_score))
-        .limit(limit)
-    )
-    listings = result.scalars().all()
-    return [ListingOut.model_validate(l) for l in listings]
+    db = get_db()
+    query = {
+        "is_rejected": False,
+        "deal_score": {"$ne": None}
+    }
+    
+    cursor = db.listings.find(query).sort("deal_score", -1).limit(limit)
+    listings = await cursor.to_list(length=limit)
+    
+    for l in listings:
+        l["id"] = str(l["_id"])
+    return listings
 
 
 @router.get("/stats", response_model=StatsOut, tags=["Stats"])
-async def get_stats(session: AsyncSession = Depends(get_session)):
+async def get_stats():
     """
     Pipeline statistics overview.
     """
-    total_result = await session.execute(select(func.count(Listing.id)))
-    total = total_result.scalar() or 0
-
-    notified_result = await session.execute(
-        select(func.count(Listing.id)).where(Listing.is_notified == True)  # noqa: E712
-    )
-    notified = notified_result.scalar() or 0
-
-    rejected_result = await session.execute(
-        select(func.count(Listing.id)).where(Listing.is_rejected == True)  # noqa: E712
-    )
-    rejected = rejected_result.scalar() or 0
-
-    avg_score_result = await session.execute(
-        select(func.avg(Listing.deal_score)).where(Listing.is_rejected == False)  # noqa: E712
-    )
-    avg_score = avg_score_result.scalar()
-
-    avg_price_result = await session.execute(
-        select(func.avg(Listing.price)).where(Listing.price.isnot(None))
-    )
-    avg_price = avg_price_result.scalar()
-
-    top_score_result = await session.execute(
-        select(func.max(Listing.deal_score))
-    )
-    top_score = top_score_result.scalar()
+    db = get_db()
+    
+    total = await db.listings.count_documents({})
+    notified = await db.listings.count_documents({"is_notified": True})
+    rejected = await db.listings.count_documents({"is_rejected": True})
+    
+    # Aggregation for averages and max
+    pipeline = [
+        {"$match": {"is_rejected": False}},
+        {"$group": {
+            "_id": None,
+            "avg_score": {"$avg": "$deal_score"},
+            "avg_price": {"$avg": "$price"},
+            "max_score": {"$max": "$deal_score"}
+        }}
+    ]
+    
+    agg_result = await db.listings.aggregate(pipeline).to_list(length=1)
+    
+    if agg_result:
+        stats = agg_result[0]
+        avg_score = stats.get("avg_score")
+        avg_price = stats.get("avg_price")
+        top_score = stats.get("max_score")
+    else:
+        avg_score = avg_price = top_score = None
 
     return StatsOut(
         total_listings=total,
@@ -170,10 +176,13 @@ async def get_stats(session: AsyncSession = Depends(get_session)):
 
 
 @router.post("/scrape/run", response_model=RunResponse, tags=["Pipeline"])
-async def trigger_scrape(background_tasks: BackgroundTasks):
+async def trigger_scrape(
+    background_tasks: BackgroundTasks,
+    api_key: str = Depends(get_api_key)
+):
     """
     Manually trigger a pipeline run in the background.
-    Returns immediately; the run happens asynchronously.
+    Protected by API key to prevent unauthorized scraping.
     """
     from app.services.pipeline import run_pipeline
     background_tasks.add_task(run_pipeline)

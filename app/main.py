@@ -25,9 +25,7 @@ async def lifespan(app: FastAPI):
     console.rule("[bold cyan]MacBook Deal Intelligence[/bold cyan]")
     console.print(f"[dim]Version {settings.app_version}[/dim]")
 
-    # Ensure data directory exists (for SQLite)
-    if settings.database_type == "sqlite":
-        os.makedirs(os.path.dirname(settings.sqlite_path), exist_ok=True)
+    # Initialize database
 
     # Initialize database and create tables
     await init_db()
@@ -63,8 +61,11 @@ app = FastAPI(
 # CORS — allow all origins for dev (restrict in prod)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[
+        "http://localhost:3000",
+        "https://macbook-ebay-scraper.varadaj47.workers.dev"
+    ],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

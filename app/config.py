@@ -33,9 +33,7 @@ class Settings(BaseSettings):
     telegram_chat_id: str = Field(..., description="Telegram chat ID")
 
     # ── Database ──────────────────────────────────────────────────
-    database_type: Literal["sqlite", "postgresql"] = Field("sqlite")
-    sqlite_path: str = Field("./data/deals.db")
-    database_url: str | None = Field(None, description="PostgreSQL URL (prod)")
+    mongodb_uri: str | None = Field(None, description="MongoDB Atlas connection URI")
 
     # ── Pipeline Settings ─────────────────────────────────────────
     deal_score_threshold: float = Field(7.0, ge=0.0, le=10.0)
@@ -46,6 +44,7 @@ class Settings(BaseSettings):
     # ── Feature Flags ─────────────────────────────────────────────
     enable_ai_filter: bool = Field(True)
     enable_telegram: bool = Field(True)
+    admin_api_key: str = Field("change-me-in-production", description="API key to protect scraping trigger endpoint")
 
     # ── App Meta ──────────────────────────────────────────────────
     app_name: str = "MacBook Deal Intelligence"
