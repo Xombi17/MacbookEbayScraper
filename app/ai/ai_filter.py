@@ -63,12 +63,11 @@ def keyword_pre_filter(listing: ListingData) -> tuple[bool, Optional[str]]:
 class AIFilter:
     def __init__(self):
         settings = get_settings()
-        # GitHub Models is OpenAI-SDK-compatible — just point to their endpoint
         self._client = AsyncOpenAI(
-            base_url=settings.github_models_endpoint,
-            api_key=settings.github_token,
+            base_url=settings.gh_models_endpoint,
+            api_key=settings.gh_models_token,
         )
-        self._model = settings.github_chat_model
+        self._model = settings.gh_chat_model
 
     @retry(
         stop=stop_after_attempt(3),

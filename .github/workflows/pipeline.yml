@@ -34,12 +34,12 @@ jobs:
       - name: Run Pipeline
         env:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_MODELS_TOKEN: ${{ secrets.GH_MODELS_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
-          GITHUB_CHAT_MODEL: "gpt-4o"
+          GH_CHAT_MODEL: "gpt-4o"
           RSS_PROXY_URL: "https://macbook-ebay-scraper.varadaj47.workers.dev"
           DEAL_SCORE_THRESHOLD: 7.0
           MAX_PRICE_USD: 1500.0

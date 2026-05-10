@@ -21,9 +21,9 @@ class Settings(BaseSettings):
     rss_proxy_url: str | None = Field(None, description="Optional Cloudflare Worker URL to proxy RSS feeds")
 
     # ── AI (GitHub Models) ────────────────────────────────────────
-    github_token: str = Field(..., description="GitHub personal access token for GitHub Models")
-    github_chat_model: str = Field("openai/gpt-4o", description="GitHub Models model name")
-    github_models_endpoint: str = Field(
+    gh_models_token: str = Field(..., description="GitHub personal access token for GitHub Models")
+    gh_chat_model: str = Field("gpt-4o", description="GitHub Models model name")
+    gh_models_endpoint: str = Field(
         "https://models.inference.ai.azure.com",
         description="GitHub Models inference endpoint",
     )
