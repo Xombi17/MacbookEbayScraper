@@ -47,7 +47,6 @@ Verification Checklist:
 - Does the title match the description for RAM/Chip?
 - Is there any mention of 'MDM', 'Locked', 'Parts only', or 'Water damage'?
 - Is the RAM actually unified memory? (Reject if it looks like a generic PC listing)
-"""
 
 Guidelines:
 - Set is_rejected=true if scam_probability > 0.5 or listing is clearly unsuitable
