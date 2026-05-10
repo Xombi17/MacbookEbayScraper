@@ -149,6 +149,46 @@ class AIFilter:
                 summary="AI analysis failed; manual review recommended.",
             )
 
+    async def pre_filter_listings(self, listings: list[dict], limit: int = 15) -> list[dict]:
+        """
+        AI-powered pre-filtering to select the best candidates from a search result.
+        Returns the subset of listings that are worth extracting.
+        """
+        if not listings:
+            return []
+            
+        settings = get_settings()
+        if not settings.enable_ai_filter:
+            return listings[:limit]
+
+        from app.ai.prompts import build_pre_filter_prompt
+        prompt = build_pre_filter_prompt(listings, limit)
+
+        try:
+            response = await self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": "system", "content": "You are a smart MacBook deal hunter."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.1,
+                response_format={"type": "json_object"},
+            )
+            
+            content = response.choices[0].message.content or "{}"
+            result = json.loads(content)
+            indices = result.get("worth_investigating", [])
+            
+            # Map indices back to listings
+            worth_investigating = [listings[i] for i in indices if 0 <= i < len(listings)]
+            
+            console.print(f"  [cyan]🤖 AI Pre-filter:[/cyan] Selected [bold]{len(worth_investigating)}[/bold] candidates out of {len(listings)}.")
+            return worth_investigating[:limit]
+            
+        except Exception as exc:
+            console.print(f"  [red]✗ AI pre-filter failed: {exc}[/red]")
+            return listings[:limit]
+
 
 # Module-level singleton
 _filter: AIFilter | None = None

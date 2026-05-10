@@ -165,8 +165,13 @@ async def run_pipeline() -> PipelineResult:
         result.duration_seconds = (datetime.now() - start).total_seconds()
         return result
 
+    # Step 1.5: Smart Pre-filter (Save credits!)
+    # AI analyzes (Title + Price) to pick the top candidates before deep extraction
+    ai_filter = get_ai_filter()
+    to_extract = await ai_filter.pre_filter_listings(new_listings, limit=15)
+
     # Step 2: Process sequentially
-    for raw in new_listings:
+    for raw in to_extract:
         # Check Daily Budget
         today_start = datetime.combine(datetime.now().date(), time.min)
         scraped_today = await db.listings.count_documents({"created_at": {"$gte": today_start}})

@@ -49,24 +49,45 @@ async def discover_new_listings(db) -> list[dict]:
             if not result or not result.get("markdown"):
                 continue
                 
-            matches = re.findall(r"https://www\.ebay\.com/itm/\d+", result["markdown"])
+            # Regex to find [Title](URL) patterns
+            # eBay listings often look like [Title](URL) in Firecrawl markdown
+            matches = re.findall(r"\[([^\]]+)\]\((https://www\.ebay\.com/itm/\d+)[^\)]*\)", result["markdown"])
             
+            # If no [Title](URL) found, fallback to just URL search
+            if not matches:
+                urls = re.findall(r"https://www\.ebay\.com/itm/\d+", result["markdown"])
+                matches = [(None, url) for url in urls]
+
             # Filter matches against DB
-            unique_matches = list(set(matches))
-            ids_to_check = [_extract_listing_id(m) for m in unique_matches if _extract_listing_id(m)]
+            unique_matches = []
+            seen_in_run = set()
+            for title, url in matches:
+                listing_id = _extract_listing_id(url)
+                if listing_id and listing_id not in seen_in_run:
+                    seen_in_run.add(listing_id)
+                    unique_matches.append((title, url, listing_id))
             
+            ids_to_check = [m[2] for m in unique_matches]
             existing = await db.listings.find({"_id": {"$in": ids_to_check}}, {"_id": 1}).to_list(length=None)
             existing_ids = {doc["_id"] for doc in existing}
             
+            # Find prices in markdown to associate with listings
+            # This is a bit fuzzy but helps the AI pre-filter
+            price_matches = re.findall(r"\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?", result["markdown"])
+
             count = 0
-            for url in unique_matches:
-                listing_id = _extract_listing_id(url)
-                if listing_id and listing_id not in seen_ids and listing_id not in existing_ids:
+            for i, (title, url, listing_id) in enumerate(unique_matches):
+                if listing_id not in existing_ids and listing_id not in seen_ids:
                     seen_ids.add(listing_id)
+                    
+                    # Try to find a price near this listing (very rough heuristic)
+                    price = price_matches[i] if i < len(price_matches) else None
+                    
                     all_discovered.append({
                         "id": listing_id,
                         "url": _normalize_url(url),
-                        "title": None,
+                        "title": title.strip() if title else None,
+                        "price_str": price,
                         "query": query
                     })
                     count += 1
