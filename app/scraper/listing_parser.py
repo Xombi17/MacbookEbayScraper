@@ -125,13 +125,23 @@ class ListingParser:
             or self._extract_h1(markdown)
         )
 
-        # Price — take the first dollar amount found (usually the listing price)
-        prices = _PRICE_RE.findall(markdown)
-        if prices:
+        # Price — Priority: Look for 'Buy It Now' or the main price block
+        # We want the primary listing price, not a bid or a similar item's price.
+        price_match = re.search(r"(?:Buy It Now|Price|Current bid):?\s*(?:US\s*)?\$\s*([\d,]+(?:\.\d{2})?)", markdown, re.IGNORECASE)
+        if price_match:
             try:
-                data.price = float(prices[0].replace(",", ""))
+                data.price = float(price_match.group(1).replace(",", ""))
             except ValueError:
                 pass
+        
+        if not data.price:
+            # Fallback to general price regex but only in the first 2500 chars to avoid 'Similar Items'
+            prices = _PRICE_RE.findall(markdown[:2500])
+            if prices:
+                try:
+                    data.price = float(prices[0].replace(",", ""))
+                except ValueError:
+                    pass
 
         # Shipping
         if _SHIPPING_FREE_RE.search(markdown):
