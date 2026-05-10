@@ -1,5 +1,5 @@
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const url = new URL(request.url);
     const targetUrl = url.searchParams.get("url");
     
@@ -7,18 +7,40 @@ export default {
       return new Response("MacBook Deal Proxy Active. Send ?url=EBAY_URL", { status: 200 });
     }
 
-    const response = await fetch(targetUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "application/rss+xml, application/xml"
-      }
-    });
+    if (!env.FIRECRAWL_API_KEY) {
+      return new Response("Missing FIRECRAWL_API_KEY environment variable", { status: 500 });
+    }
 
-    return new Response(response.body, {
-      headers: { 
-        "Content-Type": "application/rss+xml",
-        "Access-Control-Allow-Origin": "*" 
+    try {
+      const firecrawlResponse = await fetch("https://api.firecrawl.dev/v1/scrape", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${env.FIRECRAWL_API_KEY}`
+        },
+        body: JSON.stringify({
+          url: targetUrl,
+          formats: ["rawHtml"]
+        })
+      });
+
+      if (!firecrawlResponse.ok) {
+        return new Response(`Firecrawl API error: ${firecrawlResponse.statusText}`, { status: 502 });
       }
-    });
+
+      const data = await firecrawlResponse.json();
+      
+      // Firecrawl returns the raw page source in data.rawHtml if 'rawHtml' format is requested
+      const rawContent = data?.data?.rawHtml || data?.data?.html || "";
+
+      return new Response(rawContent, {
+        headers: { 
+          "Content-Type": "application/rss+xml",
+          "Access-Control-Allow-Origin": "*" 
+        }
+      });
+    } catch (error) {
+      return new Response(`Proxy Error: ${error.message}`, { status: 500 });
+    }
   }
 };

@@ -147,6 +147,15 @@ async def run_pipeline() -> PipelineResult:
         stored=0, notified=0, errors=0, duration_seconds=0.0,
     )
 
+    # Check Daily Budget upfront to avoid wasting search credits
+    today_start = datetime.combine(start.date(), time.min)
+    scraped_today = await db.listings.count_documents({"created_at": {"$gte": today_start}})
+    
+    if scraped_today >= settings.daily_credit_limit:
+        console.print(f"[bold yellow]⚠️ Daily budget reached ({scraped_today}/{settings.daily_credit_limit}). Exiting early to save credits.[/bold yellow]")
+        result.duration_seconds = (datetime.now() - start).total_seconds()
+        return result
+
     # Step 1: Discover new listings
     new_listings = await discover_new_listings(db)
     result.new_listings_found = len(new_listings)
