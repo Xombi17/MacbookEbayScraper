@@ -66,8 +66,17 @@ def _format_alert(listing: dict) -> str:
 
     title = listing.get("title") or 'MacBook Pro'
     
+    scam_prob = listing.get("scam_probability", 0.0)
+    is_rejected = listing.get("is_rejected", False)
+    
+    header = "🔥 *High-Value MacBook Deal*"
+    if is_rejected or scam_prob >= 0.5:
+        header = "🚨 *SCAM ALERT / RISKY DEAL* 🚨\n_AI flagged this listing as suspicious! Proceed with caution._"
+    elif scam_prob >= 0.3:
+        header = "⚠️ *CAUTION: Risky Listing* ⚠️\n_Minor red flags detected._"
+
     return (
-        f"🔥 *High-Value MacBook Deal*\n\n"
+        f"{header}\n\n"
         f"*{title}*\n"
         f"`{specs_str}`\n\n"
         f"💰 *Price:* {price_str}\n"

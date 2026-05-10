@@ -118,11 +118,10 @@ async def _process_listing(
 
     # 8. Notify if eligible
     notified = False
-    if (
-        not analysis.is_rejected
-        and score_breakdown.normalized >= settings.deal_score_threshold
-        and analysis.scam_probability < 0.3
-    ):
+    # ── Notification Logic (Relaxed as requested) ─────────────────────────
+    # We now notify for ANY deal above the threshold. 
+    # High-risk deals will have a 🚨 warning in the Telegram message.
+    if score_breakdown.normalized >= settings.deal_score_threshold:
         notified = await send_deal_alert(listing_doc)
         if notified:
             await db.listings.update_one(
