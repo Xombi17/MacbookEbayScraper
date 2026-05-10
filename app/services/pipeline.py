@@ -33,6 +33,7 @@ class PipelineResult:
     stored: int
     notified: int
     errors: int
+    credits_used: int
     duration_seconds: float
 
 
@@ -144,20 +145,28 @@ async def run_pipeline() -> PipelineResult:
     result = PipelineResult(
         run_at=start, feeds_checked=len(SEARCH_QUERIES),
         new_listings_found=0, extracted=0, filtered_out=0,
-        stored=0, notified=0, errors=0, duration_seconds=0.0,
+        stored=0, notified=0, errors=0, credits_used=0, duration_seconds=0.0,
     )
 
-    # Check Daily Budget upfront to avoid wasting search credits
+    # Check Daily Credit Budget (Precise Tracking)
     today_start = datetime.combine(start.date(), time.min)
-    scraped_today = await db.listings.count_documents({"created_at": {"$gte": today_start}})
     
-    if scraped_today >= settings.daily_credit_limit:
-        console.print(f"[bold yellow]⚠️ Daily budget reached ({scraped_today}/{settings.daily_credit_limit}). Exiting early to save credits.[/bold yellow]")
+    # Sum up credits used in all runs today
+    cursor = db.pipeline_runs.aggregate([
+        {"$match": {"run_at": {"$gte": today_start}}},
+        {"$group": {"_id": None, "total_credits": {"$sum": "$credits_used"}}}
+    ])
+    run_stats = await cursor.to_list(length=1)
+    credits_today = run_stats[0]["total_credits"] if run_stats else 0
+    
+    if credits_today >= settings.daily_credit_limit:
+        console.print(f"[bold yellow]⚠️ Daily Firecrawl credit limit reached ({credits_today}/{settings.daily_credit_limit}). Exiting early.[/bold yellow]")
         result.duration_seconds = (datetime.now() - start).total_seconds()
         return result
 
     # Step 1: Discover new listings
     new_listings = await discover_new_listings(db)
+    result.credits_used += 1  # Search costs 1 credit
     result.new_listings_found = len(new_listings)
 
     if not new_listings:
@@ -172,16 +181,21 @@ async def run_pipeline() -> PipelineResult:
 
     # Step 2: Process sequentially
     for raw in to_extract:
-        # Check Daily Budget
-        today_start = datetime.combine(datetime.now().date(), time.min)
-        scraped_today = await db.listings.count_documents({"created_at": {"$gte": today_start}})
+        # Re-check Daily Budget (Precise)
+        cursor = db.pipeline_runs.aggregate([
+            {"$match": {"run_at": {"$gte": today_start}}},
+            {"$group": {"_id": None, "total_credits": {"$sum": "$credits_used"}}}
+        ])
+        run_stats = await cursor.to_list(length=1)
+        credits_today = (run_stats[0]["total_credits"] if run_stats else 0) + result.credits_used
         
-        if scraped_today >= settings.daily_credit_limit:
-            console.print(f"[bold yellow]⚠️ Daily budget reached ({scraped_today}/{settings.daily_credit_limit}).[/bold yellow]")
+        if credits_today >= settings.daily_credit_limit:
+            console.print(f"[bold yellow]⚠️ Daily Firecrawl credit limit reached ({credits_today}/{settings.daily_credit_limit}). Stopping extraction.[/bold yellow]")
             break
 
         try:
             stored, notified = await _process_listing(raw, db, settings)
+            result.credits_used += 1  # Extraction costs 1 credit
             if stored:
                 result.extracted += 1
                 result.stored += 1
@@ -201,8 +215,14 @@ async def run_pipeline() -> PipelineResult:
     table.add_row("New listings found", str(result.new_listings_found))
     table.add_row("Stored to MongoDB", str(result.stored))
     table.add_row("Telegram alerts sent", str(result.notified))
+    table.add_row("Firecrawl credits used", str(result.credits_used))
     table.add_row("Duration", f"{result.duration_seconds:.1f}s")
     console.print(table)
+
+    # Save run record to MongoDB
+    from dataclasses import asdict
+    await db.pipeline_runs.insert_one(asdict(result))
+
     console.rule("[bold green]✓ Pipeline Complete[/bold green]")
 
     return result
