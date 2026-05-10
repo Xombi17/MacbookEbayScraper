@@ -64,7 +64,11 @@ class FirecrawlClient:
             }
 
         except Exception as exc:
-            console.print(f"  [red]✗ Firecrawl error for {url}: {exc}[/red]")
+            settings = get_settings()
+            if settings.debug:
+                console.print(f"  [red]✗ Firecrawl error for {url}: {exc}[/red]")
+            else:
+                console.print("  [red]✗ Firecrawl extraction failed[/red]")
             return None
 
 

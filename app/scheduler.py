@@ -15,10 +15,14 @@ _scheduler: AsyncIOScheduler | None = None
 async def _scheduled_run():
     """Wrapper that catches exceptions so scheduler keeps running."""
     from app.services.pipeline import run_pipeline
+    settings = get_settings()
     try:
         await run_pipeline()
     except Exception as exc:
-        console.print(f"[red]✗ Scheduled pipeline run failed: {exc}[/red]")
+        if settings.debug:
+            console.print(f"[red]✗ Scheduled pipeline run failed: {exc}[/red]")
+        else:
+            console.print("[red]✗ Scheduled pipeline run failed[/red]")
 
 
 def get_scheduler() -> AsyncIOScheduler:

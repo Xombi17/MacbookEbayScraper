@@ -5,8 +5,10 @@ Adapted for MongoDB.
 
 import re
 import secrets
+import time
+from collections import defaultdict, deque
 
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, Security
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, Security, Request
 from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel
 from typing import Optional
@@ -20,6 +22,7 @@ router = APIRouter()
 API_KEY_NAME = "X-API-Key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 _LISTING_ID_RE = re.compile(r"^\d{10,13}$")
+_scrape_rate_limit_state: dict[str, deque[float]] = defaultdict(deque)
 
 async def get_api_key(api_key_header: str = Security(api_key_header)):
     """API key verification for protected endpoints."""
@@ -186,6 +189,7 @@ async def get_stats():
 
 @router.post("/scrape/run", response_model=RunResponse, tags=["Pipeline"])
 async def trigger_scrape(
+    request: Request,
     background_tasks: BackgroundTasks,
     api_key: str = Depends(get_api_key)
 ):
@@ -193,6 +197,19 @@ async def trigger_scrape(
     Manually trigger a pipeline run in the background.
     Protected by API key to prevent unauthorized scraping.
     """
+    settings = get_settings()
+    now = time.time()
+    client_id = request.client.host if request.client else "unknown"
+    bucket = _scrape_rate_limit_state[client_id]
+
+    while bucket and now - bucket[0] > settings.scrape_rate_limit_window_seconds:
+        bucket.popleft()
+
+    if len(bucket) >= settings.scrape_rate_limit_max_requests:
+        raise HTTPException(status_code=429, detail="Too many scrape requests. Please retry later.")
+
+    bucket.append(now)
+
     from app.services.pipeline import run_pipeline
     background_tasks.add_task(run_pipeline)
 

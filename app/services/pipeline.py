@@ -207,7 +207,10 @@ async def run_pipeline() -> PipelineResult:
             if notified:
                 result.notified += 1
         except Exception as exc:
-            console.print(f"  [red]✗ Error processing {raw['url']}: {exc}[/red]")
+            if settings.debug:
+                console.print(f"  [red]✗ Error processing {raw['url']}: {exc}[/red]")
+            else:
+                console.print("  [red]✗ Error processing listing[/red]")
             result.errors += 1
 
         await asyncio.sleep(1.5)

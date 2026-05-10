@@ -181,13 +181,25 @@ class ListingParser:
                 except ValueError:
                     pass
 
-        # Seller rating
-        rating_match = _SELLER_RATING_RE.search(markdown)
-        if rating_match:
-            try:
-                data.seller_rating = float(rating_match.group(1))
-            except ValueError:
-                pass
+        # Seller rating — avoid sponsored items by looking for context
+        # eBay usually puts seller info in a specific block
+        seller_section_match = re.search(r"Seller information.*?(?:\n|$)", markdown, re.IGNORECASE)
+        if seller_section_match:
+            section_text = markdown[seller_section_match.start():seller_section_match.start()+500]
+            rating_match = _SELLER_RATING_RE.search(section_text)
+            if rating_match:
+                try:
+                    data.seller_rating = float(rating_match.group(1))
+                except ValueError:
+                    pass
+        else:
+            # Fallback but check for "positive feedback" near the top
+            rating_match = _SELLER_RATING_RE.search(markdown[:2000])
+            if rating_match:
+                try:
+                    data.seller_rating = float(rating_match.group(1))
+                except ValueError:
+                    pass
 
         # Seller name
         name_match = _SELLER_NAME_RE.search(markdown)

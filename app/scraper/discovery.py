@@ -95,6 +95,10 @@ async def discover_new_listings(db) -> list[dict]:
             console.print(f"    → Found [bold]{count}[/bold] new items for query '{query}'")
             
         except Exception as e:
-            console.print(f"  [red]✗ Search crawl failed for {query}: {e}[/red]")
+            settings = get_settings()
+            if settings.debug:
+                console.print(f"  [red]✗ Search crawl failed for {query}: {e}[/red]")
+            else:
+                console.print("  [red]✗ Search crawl failed[/red]")
             
     return all_discovered

@@ -142,7 +142,10 @@ class AIFilter:
                 summary=result.get("summary", ""),
             )
         except Exception as exc:
-            console.print(f"  [red]✗ AI analysis failed: {exc}[/red]")
+            if settings.debug:
+                console.print(f"  [red]✗ AI analysis failed: {exc}[/red]")
+            else:
+                console.print("  [red]✗ AI analysis failed[/red]")
             # Fail open — don't reject listing on API error
             return AIAnalysis(
                 skipped_ai=True,
@@ -186,7 +189,10 @@ class AIFilter:
             return worth_investigating[:limit]
             
         except Exception as exc:
-            console.print(f"  [red]✗ AI pre-filter failed: {exc}[/red]")
+            if settings.debug:
+                console.print(f"  [red]✗ AI pre-filter failed: {exc}[/red]")
+            else:
+                console.print("  [red]✗ AI pre-filter failed[/red]")
             return listings[:limit]
 
 

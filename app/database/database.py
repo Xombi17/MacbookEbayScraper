@@ -39,7 +39,10 @@ async def init_db() -> None:
             f"([cyan]{db_name}[/cyan])"
         )
     except Exception as e:
-        console.print(f"[bold red]✗[/bold red] MongoDB connection failed: {e}")
+        if settings.debug:
+            console.print(f"[bold red]✗[/bold red] MongoDB connection failed: {e}")
+        else:
+            console.print("[bold red]✗[/bold red] MongoDB connection failed")
         raise e
 
 

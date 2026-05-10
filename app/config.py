@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     max_price_usd: float = Field(1500.0, gt=0)
     run_interval_hours: int = Field(6, ge=1, le=24)
     daily_credit_limit: int = Field(50, ge=1)
+    scrape_rate_limit_window_seconds: int = Field(60, ge=1)
+    scrape_rate_limit_max_requests: int = Field(3, ge=1)
 
     # ── Feature Flags ─────────────────────────────────────────────
     enable_ai_filter: bool = Field(True)
@@ -67,8 +69,8 @@ class Settings(BaseSettings):
 # ── Static constants ──────────────────────────────────────────────────────────
 
 SEARCH_QUERIES: list[str] = [
-    # Top Priority: Newest Max models with high RAM, excluding common junk
-    "MacBook Pro (M1, M2, M3, M4, M5) Max (\"64GB\", \"32GB\", \"96GB\", \"128GB\") -(broken, parts, locked, icloud, cracked, mdm, as is)"
+    # Broad Apple Silicon search covering M1 through M5 Max/Pro
+    'MacBook Pro (M1, M2, M3, M4, M5) (16GB, 32GB, 64GB, 96GB, 128GB) -broken -parts -locked -icloud'
 ]
 
 BAD_KEYWORDS: list[str] = [

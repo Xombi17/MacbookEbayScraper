@@ -45,12 +45,15 @@ def _format_alert(listing: dict) -> str:
         price_str += " (free shipping)"
 
     # Seller line
-    seller_parts = []
-    if listing.get("seller_name"):
-        seller_parts.append(listing["seller_name"])
-    if listing.get("seller_rating"):
-        seller_parts.append(f"{listing['seller_rating']:.1f}% feedback")
-    seller_str = " · ".join(seller_parts) if seller_parts else "Seller unknown"
+    seller_name = listing.get("seller_name") or "Seller unknown"
+    seller_rating = listing.get("seller_rating")
+    
+    if seller_rating and seller_rating > 0:
+        seller_str = f"{seller_name} ({seller_rating:.1f}% feedback)"
+    elif seller_rating == 0:
+        seller_str = f"{seller_name} (⚠️ NEW SELLER / 0% FEEDBACK)"
+    else:
+        seller_str = f"{seller_name} (Rating unknown)"
 
     # Battery
     batt_str = f"{listing['battery_health']}%" if listing.get("battery_health") else "Not reported"
@@ -114,7 +117,8 @@ async def send_deal_alert(listing: dict) -> bool:
             or (f"https://www.ebay.com/itm/{listing['_id']}" if "_id" in listing and str(listing["_id"]).isdigit() else "https://ebay.com")
         )
         
-        console.print(f"  [dim]DEBUG: Sending Telegram link -> {listing_url}[/dim]")
+        if settings.debug:
+            console.print(f"  [dim]DEBUG: Sending Telegram link -> {listing_url}[/dim]")
 
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton(
@@ -142,5 +146,8 @@ async def send_deal_alert(listing: dict) -> bool:
         return True
 
     except Exception as exc:
-        console.print(f"  [red]✗ Telegram error: {exc}[/red]")
+        if settings.debug:
+            console.print(f"  [red]✗ Telegram error: {exc}[/red]")
+        else:
+            console.print("  [red]✗ Telegram notification failed[/red]")
         return False
