@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     # ── Scraping ──────────────────────────────────────────────────
     firecrawl_api_key: str = Field(..., description="Firecrawl API key")
+    rss_proxy_url: str | None = Field(None, description="Optional Cloudflare Worker URL to proxy RSS feeds")
 
     # ── AI (GitHub Models) ────────────────────────────────────────
     github_token: str = Field(..., description="GitHub personal access token for GitHub Models")
@@ -93,6 +94,18 @@ BAD_KEYWORDS: list[str] = [
     "untested",
     "as is",
 ]
+
+def build_feed_url(query: str) -> str:
+    settings = get_settings()
+    base_url = EBAY_RSS_TEMPLATE.format(query=query.replace(" ", "+"))
+    
+    if settings.rss_proxy_url:
+        # Route through the Cloudflare Worker proxy
+        import urllib.parse
+        encoded_url = urllib.parse.quote(base_url)
+        return f"{settings.rss_proxy_url.rstrip('/')}/?url={encoded_url}"
+        
+    return base_url
 
 # eBay RSS feed template
 EBAY_RSS_TEMPLATE = (
