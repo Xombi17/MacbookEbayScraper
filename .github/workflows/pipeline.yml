@@ -1,0 +1,66 @@
+name: MacBook Deal Pipeline
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Run every 6 hours
+  workflow_dispatch:      # Allow manual trigger from GitHub UI
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write     # Needed to commit database updates back to repo
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create data directory
+        run: mkdir -p data
+
+      - name: Run Pipeline
+        env:
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_CHAT_MODEL: "gpt-4o"
+          DATABASE_TYPE: "sqlite"
+          SQLITE_PATH: "./data/deals.db"
+          DEAL_SCORE_THRESHOLD: 7.0
+          MAX_PRICE_USD: 1500.0
+          DAILY_CREDIT_LIMIT: 50
+          ENABLE_AI_FILTER: "true"
+          ENABLE_TELEGRAM: "true"
+        run: |
+          # We use a small script to trigger the pipeline without starting the FastAPI server
+          python -c "
+          import asyncio
+          from app.database.database import init_db
+          from app.services.pipeline import run_pipeline
+          async def main():
+              await init_db()
+              await run_pipeline()
+          asyncio.run(main())
+          "
+
+      - name: Commit Database Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/deals.db
+          git commit -m "chore: update database [skip ci]" || echo "No changes to commit"
+          git push
