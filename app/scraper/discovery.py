@@ -1,5 +1,6 @@
 """
 Firecrawl Discovery — Optimized for MongoDB.
+Now serves as the primary discovery method to save credits.
 """
 
 import re
@@ -26,14 +27,15 @@ def _normalize_url(url: str) -> str:
     return url
 
 
-async def discover_via_firecrawl(db) -> list[dict]:
+async def discover_new_listings(db) -> list[dict]:
     """
-    Fallback discovery using Firecrawl search results.
+    Primary discovery using Firecrawl search results.
+    Consolidated to burn only 1 credit per run.
     """
     firecrawl = get_firecrawl_client()
     target_queries = SEARCH_QUERIES
     
-    console.print(f"\n[bold yellow]🕵️ Fallback: Discovering via Firecrawl for {len(target_queries)} queries...[/bold yellow]")
+    console.print(f"\n[bold green]🕵️ Discovering deals natively via Firecrawl for {len(target_queries)} query...[/bold green]")
     
     all_discovered = []
     seen_ids = set()

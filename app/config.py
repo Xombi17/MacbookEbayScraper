@@ -18,7 +18,6 @@ class Settings(BaseSettings):
 
     # ── Scraping ──────────────────────────────────────────────────
     firecrawl_api_key: str = Field(..., description="Firecrawl API key")
-    rss_proxy_url: str | None = Field(None, description="Optional Cloudflare Worker URL to proxy RSS feeds")
 
     # ── AI (GitHub Models) ────────────────────────────────────────
     gh_models_token: str = Field(..., description="GitHub personal access token for GitHub Models")
@@ -65,15 +64,7 @@ class Settings(BaseSettings):
 
 SEARCH_QUERIES: list[str] = [
     # Top Priority: Newest Max models with high RAM, excluding common junk
-    "MacBook Pro (M4, M5) Max \"64GB\" -(broken, parts, locked, icloud, cracked, mdm)",
-    "MacBook Pro M3 Max \"64GB\" -(broken, parts, locked, icloud, cracked, mdm)",
-    "MacBook Pro M2 Max \"64GB\" -(broken, parts, locked, icloud, cracked, mdm)",
-    "MacBook Pro M1 Max \"64GB\" -(broken, parts, locked, icloud, cracked, mdm)",
-    # Secondary: 32GB models if the price is a steal
-    "MacBook Pro (M2, M3, M4) Max \"32GB\" -(broken, parts, locked, icloud, mdm)",
-    # General fallback for mislabeled high-RAM deals
-    "MacBook Pro \"128GB\" -(broken, parts, mdm)",
-    "MacBook Pro \"96GB\" -(broken, parts, mdm)",
+    "MacBook Pro (M1, M2, M3, M4, M5) Max (\"64GB\", \"32GB\", \"96GB\", \"128GB\") -(broken, parts, locked, icloud, cracked, mdm, as is)"
 ]
 
 BAD_KEYWORDS: list[str] = [
@@ -93,26 +84,6 @@ BAD_KEYWORDS: list[str] = [
     "untested",
     "as is",
 ]
-
-def build_feed_url(query: str) -> str:
-    settings = get_settings()
-    base_url = EBAY_RSS_TEMPLATE.format(query=query.replace(" ", "+"))
-    
-    if settings.rss_proxy_url:
-        # Route through the Cloudflare Worker proxy
-        import urllib.parse
-        encoded_url = urllib.parse.quote(base_url)
-        return f"{settings.rss_proxy_url.rstrip('/')}/?url={encoded_url}"
-        
-    return base_url
-
-# eBay RSS feed template
-EBAY_RSS_TEMPLATE = (
-    "https://www.ebay.com/sch/i.html"
-    "?_nkw={query}"
-    "&_sop=10"      # sort by newest first
-    "&_rss=1"
-)
 
 # Singleton accessor
 _settings: Settings | None = None

@@ -11,7 +11,7 @@ from rich.table import Table
 
 from app.config import get_settings, SEARCH_QUERIES
 from app.database.database import get_db
-from app.rss.rss_monitor import discover_new_listings
+from app.scraper.discovery import discover_new_listings
 from app.scraper.firecrawl_client import get_firecrawl_client
 from app.scraper.listing_parser import get_parser
 from app.ai.ai_filter import get_ai_filter
