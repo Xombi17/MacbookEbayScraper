@@ -37,9 +37,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
           GITHUB_CHAT_MODEL: "gpt-4o"
-          DATABASE_TYPE: "sqlite"
-          SQLITE_PATH: "./data/deals.db"
+          RSS_PROXY_URL: "https://macbook-ebay-scraper.varadaj47.workers.dev"
           DEAL_SCORE_THRESHOLD: 7.0
           MAX_PRICE_USD: 1500.0
           DAILY_CREDIT_LIMIT: 50
@@ -56,11 +57,3 @@ jobs:
               await run_pipeline()
           asyncio.run(main())
           "
-
-      - name: Commit Database Changes
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/deals.db
-          git commit -m "chore: update database [skip ci]" || echo "No changes to commit"
-          git push
