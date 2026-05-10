@@ -24,7 +24,9 @@ async def init_db() -> None:
         # Fallback for local dev if URI isn't provided
         uri = "mongodb://localhost:27017"
     
-    _client = AsyncIOMotorClient(uri)
+    import certifi
+    
+    _client = AsyncIOMotorClient(uri, tlsCAFile=certifi.where())
     # Use the database name from the URI or default to 'macbook_deals'
     db_name = uri.split("/")[-1].split("?")[0] or "macbook_deals"
     _db = _client[db_name]
