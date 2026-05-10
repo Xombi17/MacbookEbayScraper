@@ -11,7 +11,8 @@ CRITICAL RULES:
 1. NEVER guess or "hallucinate" RAM or Chip specs. If the listing is ambiguous, mark it as high scam probability.
 2. If the Title says "M1 Max" but the description says "M1 Pro", set is_rejected=true and rejection_reason="Spec conflict".
 3. If the Title says "128GB RAM" but the Technical Specs section in the markdown says "64GB", reject it.
-4. You must respond with a valid JSON object and nothing else. No markdown fences.
+4. SELLER REPUTATION: If a seller has >98% positive feedback, they are likely trustworthy. Be less skeptical of low prices from these sellers unless there are clear hardware red flags (like MDM or M5 chip).
+5. You must respond with a valid JSON object and nothing else. No markdown fences.
 """
 
 USER_PROMPT_TEMPLATE = """\
@@ -21,6 +22,7 @@ Analyze this eBay listing for an Apple Silicon MacBook Pro.
 Title: {title}
 Price: ${price}
 Condition: {condition}
+Seller Rating: {seller_rating}%
 Detected Chip: {chip}
 Detected RAM: {ram_gb}GB
 Detected Storage: {storage_gb}GB

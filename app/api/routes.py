@@ -3,6 +3,9 @@ FastAPI routes — REST API for querying listings and triggering pipeline runs.
 Adapted for MongoDB.
 """
 
+import re
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, Security
 from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel
@@ -16,11 +19,14 @@ router = APIRouter()
 
 API_KEY_NAME = "X-API-Key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+_LISTING_ID_RE = re.compile(r"^\d{10,13}$")
 
 async def get_api_key(api_key_header: str = Security(api_key_header)):
     """API key verification for protected endpoints."""
     settings = get_settings()
-    if api_key_header != settings.admin_api_key:
+    if not api_key_header:
+        raise HTTPException(status_code=401, detail="Missing API key")
+    if not secrets.compare_digest(api_key_header, settings.admin_api_key):
         raise HTTPException(status_code=403, detail="Could not validate API key")
     return api_key_header
 
@@ -72,7 +78,7 @@ async def get_listings(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     min_score: Optional[float] = Query(None, ge=0.0, le=10.0),
-    chip: Optional[str] = Query(None, description="Filter by chip e.g. 'M1 Max'"),
+    chip: Optional[str] = Query(None, max_length=64, description="Filter by chip e.g. 'M1 Max'"),
     min_ram: Optional[int] = Query(None, description="Minimum RAM in GB"),
     include_rejected: bool = Query(False)
 ):
@@ -87,7 +93,7 @@ async def get_listings(
     if min_score is not None:
         query["deal_score"] = {"$gte": min_score}
     if chip:
-        query["chip"] = {"$regex": chip, "$options": "i"}
+        query["chip"] = {"$regex": re.escape(chip), "$options": "i"}
     if min_ram:
         query["ram_gb"] = {"$gte": min_ram}
 
@@ -105,6 +111,9 @@ async def get_listing(listing_id: str):
     """
     Retrieve a single listing by ID.
     """
+    if not _LISTING_ID_RE.fullmatch(listing_id):
+        raise HTTPException(status_code=400, detail="Invalid listing id format")
+
     db = get_db()
     listing = await db.listings.find_one({"_id": listing_id})
     if not listing:

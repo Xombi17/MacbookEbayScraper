@@ -4,8 +4,7 @@ All settings are loaded from environment variables / .env file.
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
-from typing import Literal
+from pydantic import Field, model_validator
 
 
 class Settings(BaseSettings):
@@ -43,21 +42,26 @@ class Settings(BaseSettings):
     # ── Feature Flags ─────────────────────────────────────────────
     enable_ai_filter: bool = Field(True)
     enable_telegram: bool = Field(True)
-    admin_api_key: str = Field("change-me-in-production", description="API key to protect scraping trigger endpoint")
+    admin_api_key: str = Field(..., min_length=8, description="API key to protect scraping trigger endpoint")
 
     # ── App Meta ──────────────────────────────────────────────────
     app_name: str = "MacBook Deal Intelligence"
     app_version: str = "1.0.0"
     debug: bool = Field(False)
 
-    def get_database_url(self) -> str:
-        """Returns the appropriate async database URL."""
-        if self.database_type == "postgresql":
-            if not self.database_url:
-                raise ValueError("DATABASE_URL must be set when DATABASE_TYPE=postgresql")
-            return self.database_url
-        # SQLite async URL
-        return f"sqlite+aiosqlite:///{self.sqlite_path}"
+    @model_validator(mode="after")
+    def validate_security_settings(self):
+        if self.admin_api_key.strip().lower() in {
+            "change-me-in-production",
+            "changeme",
+            "default",
+            "admin",
+            "password",
+        }:
+            raise ValueError("ADMIN_API_KEY must be a strong, non-default secret")
+        if len(self.admin_api_key.strip()) < 8:
+            raise ValueError("ADMIN_API_KEY must be at least 8 characters")
+        return self
 
 
 # ── Static constants ──────────────────────────────────────────────────────────

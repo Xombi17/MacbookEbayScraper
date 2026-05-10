@@ -107,10 +107,19 @@ async def send_deal_alert(listing: dict) -> bool:
         message = _format_alert(listing)
 
         # Inline button to open the listing
+        # Try multiple keys to ensure we find the link
+        listing_url = (
+            listing.get("url") 
+            or listing.get("listing_url") 
+            or (f"https://www.ebay.com/itm/{listing['_id']}" if "_id" in listing and str(listing["_id"]).isdigit() else "https://ebay.com")
+        )
+        
+        console.print(f"  [dim]DEBUG: Sending Telegram link -> {listing_url}[/dim]")
+
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton(
                 text="🔗 Open Listing on eBay",
-                url=listing.get("url") or listing.get("listing_url", "https://ebay.com"),
+                url=listing_url,
             )]
         ])
 

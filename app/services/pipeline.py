@@ -122,6 +122,12 @@ async def _process_listing(
     # We now notify for ANY deal above the threshold. 
     # High-risk deals will have a 🚨 warning in the Telegram message.
     if score_breakdown.normalized >= settings.deal_score_threshold:
+        # SELLER REPUTATION OVERRIDE: If the seller is highly trusted (>98%),
+        # we trust the deal even if the AI is suspicious of the low price.
+        if (listing_doc.get("seller_rating") or 0) >= 98.0:
+            listing_doc["scam_probability"] = min(listing_doc.get("scam_probability", 0.0), 0.1)
+            listing_doc["is_rejected"] = False
+
         notified = await send_deal_alert(listing_doc)
         if notified:
             await db.listings.update_one(

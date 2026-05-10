@@ -58,16 +58,16 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS — allow all origins for dev (restrict in prod)
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://macbook-ebay-scraper.varadaj47.workers.dev"
+        "https://macbook-ebay-scraper.varadaj47.workers.dev",
     ],
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "X-API-Key"],
 )
 
 # Mount API router
