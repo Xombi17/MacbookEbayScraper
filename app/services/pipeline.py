@@ -9,7 +9,7 @@ from datetime import datetime, time
 from rich.console import Console
 from rich.table import Table
 
-from app.config import get_settings
+from app.config import get_settings, SEARCH_QUERIES
 from app.database.database import get_db
 from app.rss.rss_monitor import discover_new_listings
 from app.scraper.firecrawl_client import get_firecrawl_client
@@ -142,7 +142,7 @@ async def run_pipeline() -> PipelineResult:
     console.rule("[bold blue]🚀 MacBook Deal Pipeline Starting (MongoDB)[/bold blue]")
 
     result = PipelineResult(
-        run_at=start, feeds_checked=len(settings.SEARCH_QUERIES),
+        run_at=start, feeds_checked=len(SEARCH_QUERIES),
         new_listings_found=0, extracted=0, filtered_out=0,
         stored=0, notified=0, errors=0, duration_seconds=0.0,
     )
